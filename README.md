@@ -4,6 +4,8 @@
 
 # Circuit Simulator -- Java Swing + Oracle 19c .
 
+<img width="2555" height="1079" alt="image" src="https://github.com/user-attachments/assets/fa19975a-d6c8-478c-8bda-ed95a9c981a0" />    
+
 Aplicación Swing completa (single-file) que dibuja un circuito tipo
 Logisim simple (batería, conmutador, LED).\
 Incluye un botón para alternar Power ON/OFF y doble‑clic en el área de
