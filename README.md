@@ -4,6 +4,8 @@
 
 # Circuit Simulator -- Java Swing + Oracle 19c .
 
+<img width="2551" height="1076" alt="image" src="https://github.com/user-attachments/assets/96916153-c0ba-4c55-b978-ab98d3d5308c" />    
+
 <img width="2555" height="1079" alt="image" src="https://github.com/user-attachments/assets/fa19975a-d6c8-478c-8bda-ed95a9c981a0" />    
 
 Aplicación Swing completa (single-file) que dibuja un circuito tipo
