@@ -35,17 +35,244 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-
 public class CircuitSimulator extends JFrame {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+    private final CircuitPanel circuitPanel;
+    private final JButton powerButton;
+    private final JLabel statusLabel;
+    private boolean powerOn = false;
+    private final OracleDAO dao;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+    public CircuitSimulator() {
+        super("Circuit Simulator - Logisim-like (Swing)");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(720, 480);
+        setLocationRelativeTo(null);
+
+        dao = new OracleDAO();
+
+        circuitPanel = new CircuitPanel();
+        powerButton = new JButton("Power: OFF");
+        statusLabel = new JLabel("Último evento: --");
+
+        powerButton.addActionListener(e -> togglePower());
+
+        JPanel control = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        control.add(powerButton);
+        control.add(statusLabel);
+
+        getContentPane().setLayout(new BorderLayout());
+        getContentPane().add(circuitPanel, BorderLayout.CENTER);
+        getContentPane().add(control, BorderLayout.SOUTH);
+    }
+
+    private void togglePower() {
+        powerOn = !powerOn;
+        powerButton.setText(powerOn ? "Power: ON" : "Power: OFF");
+        circuitPanel.setPower(powerOn);
+        circuitPanel.repaint();
+
+        // Timestamp
+        Timestamp ts = new Timestamp(System.currentTimeMillis());
+        String state = powerOn ? "ON" : "OFF";
+
+        // Update UI immediately
+        statusLabel.setText("Último evento: " + state + " @ " + formatTimestamp(ts));
+
+        // Save to Oracle
+        try {
+            dao.insertEvent(state, ts);
+        } catch (SQLException ex) {
+            // Show error but allow UI to continue
+            JOptionPane.showMessageDialog(this, "Error al guardar en Oracle: " + ex.getMessage(), "DB Error", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+        }
+    }
+
+    private String formatTimestamp(Timestamp ts) {
+        return DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.ofEpochMilli(ts.getTime()));
+    }
+
+    public static void main(String[] args) {
+        // Set look and feel to system
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) {}
+
+        SwingUtilities.invokeLater(() -> {
+            CircuitSimulator sim = new CircuitSimulator();
+            sim.setVisible(true);
+        });
+    }
+
+    // -------------------------
+    // Custom drawing panel
+    // -------------------------
+    static class CircuitPanel extends JPanel {
+        private boolean powerOn = false;
+
+        public CircuitPanel() {
+            setBackground(Color.WHITE);
+            // Optional: toggle power by double-clicking the drawing area
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2) {
+                        // find top-level frame and trigger power toggle via action
+                        Window w = SwingUtilities.getWindowAncestor(CircuitPanel.this);
+                        if (w instanceof CircuitSimulator) {
+                            ((CircuitSimulator) w).togglePower();
+                        }
+                    }
+                }
+            });
+        }
+
+        public void setPower(boolean on) {
+            this.powerOn = on;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int w = getWidth();
+            int h = getHeight();
+
+            // center area where circuit is drawn
+            int cx = w / 2;
+            int cy = h / 2;
+
+            // Draw battery (left)
+            int batX = cx - 220;
+            int batY = cy - 40;
+            drawBattery(g2, batX, batY);
+
+            // Draw switch (middle)
+            int swX = cx - 40;
+            int swY = cy - 10;
+            drawSwitch(g2, swX, swY, powerOn);
+
+            // Draw LED (right)
+            int ledX = cx + 160;
+            int ledY = cy - 20;
+            drawLED(g2, ledX, ledY, powerOn);
+
+            // Wires
+            g2.setStroke(new BasicStroke(3f));
+            g2.setColor(Color.DARK_GRAY);
+            // top wire
+            g2.drawLine(batX + 80, batY + 10, swX, batY + 10);
+            g2.drawLine(swX + 40, batY + 10, ledX - 30, batY + 10);
+            // bottom wire
+            g2.drawLine(batX + 80, batY + 60, ledX - 30, batY + 60);
+
+            // If power on, draw current (animated effect simple)
+            if (powerOn) {
+                drawCurrentFlow(g2, batX + 90, batY + 10, ledX - 40, batY + 10);
+            }
+
+            // Legend
+            g2.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g2.setColor(Color.BLACK);
+            g2.drawString("Double-click the drawing area to toggle power", 10, getHeight() - 10);
+
+            g2.dispose();
+        }
+
+        private void drawBattery(Graphics2D g2, int x, int y) {
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(Color.BLACK);
+            // small terminal
+            g2.drawRect(x, y, 60, 80);
+            g2.drawLine(x + 10, y + 18, x + 50, y + 18); // small plate
+            g2.drawLine(x + 10, y + 62, x + 50, y + 62); // big plate
+            g2.drawString("Battery", x + 5, y - 6);
+        }
+
+        private void drawSwitch(Graphics2D g2, int x, int y, boolean on) {
+            g2.setStroke(new BasicStroke(3f));
+            g2.setColor(Color.BLACK);
+            // base
+            g2.drawRect(x - 10, y - 20, 80, 40);
+            // lever
+            int lx1 = x + 10;
+            int ly1 = y;
+            int lx2 = on ? x + 60 : x + 40;
+            int ly2 = y - (on ? 10 : -10);
+            g2.drawLine(lx1, ly1, lx2, ly2);
+            // knob
+            g2.fill(new Ellipse2D.Double(lx2 - 5, ly2 - 5, 10, 10));
+            g2.drawString("Switch", x + 5, y - 26);
+        }
+
+        private void drawLED(Graphics2D g2, int x, int y, boolean on) {
+            g2.setStroke(new BasicStroke(2f));
+            // LED body
+            g2.setColor(Color.GRAY);
+            g2.fillOval(x, y, 40, 40);
+            g2.setColor(Color.BLACK);
+            g2.drawOval(x, y, 40, 40);
+
+            // LED glow if on
+            if (on) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.6f));
+                g2.setColor(Color.YELLOW);
+                g2.fillOval(x - 10, y - 10, 60, 60);
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+            }
+
+            // leads
+            g2.drawLine(x + 20, y + 40, x + 20, y + 60);
+            g2.drawLine(x + 20, y, x + 20, y - 20);
+            g2.drawString("LED", x + 8, y + 58);
+        }
+
+        private void drawCurrentFlow(Graphics2D g2, int x1, int y1, int x2, int y2) {
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(new Color(255, 100, 0));
+            // simple arrows along top wire
+            int step = 30;
+            for (int x = x1; x < x2; x += step) {
+                int ax = x;
+                int ay = y1 - 6;
+                Polygon arrow = new Polygon();
+                arrow.addPoint(ax, ay);
+                arrow.addPoint(ax - 6, ay - 6);
+                arrow.addPoint(ax - 6, ay + 6);
+                g2.fill(arrow);
+            }
+        }
+    }
+
+    // -------------------------
+    // Simple DAO for Oracle
+    // -------------------------
+    static class OracleDAO {
+        // TODO: Reemplazar por configuraciones seguras en producción
+        private static final String DB_URL = "jdbc:oracle:thin:@//localhost:1521/orcl"; // ejemplo
+        private static final String DB_USER = "system";
+        private static final String DB_PASSWORD = "Tapiero123";
+
+        private static final String INSERT_SQL = "INSERT INTO CIRCUIT_LOG (STATE, EVENT_TIME) VALUES (?, ?)";
+
+        public OracleDAO() {
+            // Optional: test connection on startup (comment out if not wanted)
+            // try (Connection conn = getConnection()) { System.out.println("Connected to Oracle"); } catch (Exception e) { e.printStackTrace(); }
+        }
+
+        private Connection getConnection() throws SQLException {
+            // Ensure ojdbc driver is available in classpath
+            return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+        }
+
+        public void insertEvent(String state, Timestamp ts) throws SQLException {
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(INSERT_SQL)) {
+                ps.setString(1, state);
+                ps.setTimestamp(2, ts);
+                ps.executeUpdate();
+            }
         }
     }
 }
