@@ -10,6 +10,8 @@
 
 <img width="2554" height="1079" alt="image" src="https://github.com/user-attachments/assets/e74882ac-00fa-4149-89a1-40acffd41747" />    
 
+<img width="2555" height="1079" alt="image" src="https://github.com/user-attachments/assets/713799d0-8d51-467c-a6b2-5ff460467a2f" />    
+
 Aplicación Swing completa (single-file) que dibuja un circuito tipo
 Logisim simple (batería, conmutador, LED).\
 Incluye un botón para alternar Power ON/OFF y doble‑clic en el área de
